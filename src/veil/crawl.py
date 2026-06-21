@@ -12,9 +12,9 @@ import asyncio
 import json
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 from veil.engine import Engine
 from veil.models import FetchRequest

@@ -33,7 +33,7 @@ def _rows_extract(html, url):
 
 
 def _read_jsonl(path):
-    return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
 
 
 @pytest.fixture

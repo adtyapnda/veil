@@ -1,5 +1,9 @@
 # veil
 
+[![CI](https://github.com/adtyapnda/veil/actions/workflows/ci.yml/badge.svg)](https://github.com/adtyapnda/veil/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+
 A modular, **polite** web scraper that *cascades* through fetch strategies —
 from a near-free HTTP request up to a full stealth browser — and stops at the
 cheapest one that actually returns the page.

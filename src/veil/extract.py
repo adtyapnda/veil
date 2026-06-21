@@ -164,7 +164,7 @@ def parse_listings(html: str) -> list[dict]:
     objs = find_by_type(ld, LISTING_TYPES)
     listings = [flatten_listing(o) for o in objs]
     # Keep only rows that actually carry a price or url -- drops org/breadcrumb noise.
-    return [l for l in listings if l.get("url") or l.get("price")]
+    return [row for row in listings if row.get("url") or row.get("price")]
 
 
 def css_listings(html: str, *, card: str, fields: dict[str, str]) -> list[dict]:
