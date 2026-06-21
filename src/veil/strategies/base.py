@@ -22,6 +22,10 @@ class Strategy(abc.ABC):
     # engine can skip them gracefully instead of crashing.
     available: bool = True
 
+    # Challenge/interstitial pages are small; above this size, textual block
+    # signals are treated as noise rather than evidence of a wall.
+    CHALLENGE_PAGE_MAX_BYTES: int = 15000
+
     @abc.abstractmethod
     async def fetch(
         self, request: FetchRequest, *, proxy: Optional[str] = None
@@ -37,18 +41,24 @@ class Strategy(abc.ABC):
         if resp.status in (403, 429, 503):
             return True
         body = resp.text.lower()
-        signals = (
-            "just a moment",          # Cloudflare interstitial
-            "verifying you are human",
-            "cf-chl",                 # Cloudflare challenge token
-            "captcha",
-            "access denied",
-            "enable javascript and cookies",
-        )
-        if any(s in body for s in signals):
-            return True
-        if request.success_marker and request.success_marker.lower() not in body:
-            return True
+        # An explicit success marker is authoritative: if you told us what real
+        # content looks like and it's there, trust it over fuzzy signals.
+        if request.success_marker:
+            return request.success_marker.lower() not in body
+        # Textual challenge signals only mean "blocked" on a small interstitial.
+        # A full content page can legitimately embed these tokens (e.g. a page
+        # that *passed* a Cloudflare challenge still ships cf-chl scripts).
+        if len(resp.text) < self.CHALLENGE_PAGE_MAX_BYTES:
+            signals = (
+                "just a moment",          # Cloudflare interstitial
+                "verifying you are human",
+                "cf-chl",                 # Cloudflare challenge token
+                "captcha",
+                "access denied",
+                "enable javascript and cookies",
+            )
+            if any(s in body for s in signals):
+                return True
         return False
 
     async def aclose(self) -> None:
