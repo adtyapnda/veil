@@ -41,6 +41,33 @@ Cross-cutting concerns wrap **every** tier:
 Each tier is a `Strategy` subclass, so adding your own (e.g. a CAPTCHA-solver
 hook, or an alternate impersonation library) is one small file.
 
+## What it beats (and what it doesn't)
+
+Measured by [`examples/battletest.py`](examples/battletest.py), which probes each
+tier against real targets. Honest results, not marketing:
+
+| Target | http_basic | tls_impersonate | browser |
+|--------|:---------:|:--------------:|:-------:|
+| Plain site (control) | ✅ | ✅ | ✅ |
+| Cloudflare **JS challenge** (nowsecure.nl) | ✅ | ✅ | ✅ |
+| Bot fingerprint test (bot.sannysoft.com) | ✅ | ✅ | ✅ |
+| Reputation **hard-block 403** (scrapingcourse antibot) | ❌ | ❌ | ❌ |
+
+**The key distinction:**
+
+- **JS challenges** (`200`/`503` + a small page that runs script to test you) —
+  `veil` handles these. The browser tier executes the challenge; lighter tiers
+  often pass on header/TLS realism alone.
+- **Reputation hard-blocks** (`403` served *before* any JavaScript runs) — `veil`
+  **cannot** fix these with code. The block is decided at Cloudflare's edge from
+  your **IP reputation** + connection signals, so in-page stealth never executes.
+  The only lever is a better egress IP: plug **residential/mobile proxies** into
+  the `ProxyPool` (`--proxy-file`). That's infrastructure, not evasion code.
+
+In short: `veil` does everything the *software* side can do (TLS realism,
+JS-challenge solving, anti-detection browser). Beating an IP-reputation `403`
+is a question of proxy quality, not more scraper cleverness.
+
 ## Install
 
 ```bash
