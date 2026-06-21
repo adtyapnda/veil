@@ -36,6 +36,36 @@ except ImportError:  # pragma: no cover
 # (Stylesheets/scripts are kept -- challenges often need them.)
 _DEFAULT_BLOCKED = frozenset({"image", "font", "media"})
 
+# A real Chrome UA, kept in sync with the http_basic tier so tiers don't conflict.
+_CHROME_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+
+# Launch flags that strip the most obvious "I am automated" tells.
+_LAUNCH_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--disable-features=IsolateOrigins,site-per-process",
+    "--no-first-run",
+    "--no-default-browser-check",
+]
+
+# Injected before any page script runs: patches the classic detection surface
+# (navigator.webdriver, plugins, languages, window.chrome, permissions).
+_STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+window.chrome = window.chrome || { runtime: {} };
+Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+const _origQuery = window.navigator.permissions && window.navigator.permissions.query;
+if (_origQuery) {
+  window.navigator.permissions.query = (p) =>
+    p && p.name === 'notifications'
+      ? Promise.resolve({ state: Notification.permission })
+      : _origQuery(p);
+}
+"""
+
 
 class BrowserStrategy(Strategy):
     name = "browser"
@@ -78,10 +108,19 @@ class BrowserStrategy(Strategy):
                         "pip install 'veil-scraper[browser]' && playwright install chromium"
                     )
                 self._pw = await async_playwright().start()
-                self._browser = await self._pw.chromium.launch(headless=self.headless)
+                self._browser = await self._launch(self._pw)
             if self._sem is None:
                 self._sem = asyncio.Semaphore(self.max_contexts)
         return self._browser
+
+    async def _launch(self, pw):
+        # Real Chrome (channel="chrome") looks far less automated than bundled
+        # Chromium, but isn't always installed -- fall back gracefully.
+        opts = {"headless": self.headless, "args": _LAUNCH_ARGS}
+        try:
+            return await pw.chromium.launch(channel="chrome", **opts)
+        except Exception:  # noqa: BLE001 - chrome channel not available
+            return await pw.chromium.launch(**opts)
 
     async def _install_blocking(self, context) -> None:
         async def _route(route):
@@ -112,7 +151,14 @@ class BrowserStrategy(Strategy):
         self, request: FetchRequest, *, proxy: Optional[str] = None
     ) -> FetchResponse:
         browser = await self._ensure_browser()
-        context_kwargs = {"viewport": {"width": self.viewport[0], "height": self.viewport[1]}}
+        # Realistic context: real UA + locale/timezone so headers and JS environment
+        # agree (mismatches between these are a common bot tell).
+        context_kwargs = {
+            "viewport": {"width": self.viewport[0], "height": self.viewport[1]},
+            "user_agent": _CHROME_UA,
+            "locale": "en-US",
+            "timezone_id": "America/New_York",
+        }
         if proxy:
             context_kwargs["proxy"] = {"server": proxy}
         if request.headers:
@@ -122,6 +168,8 @@ class BrowserStrategy(Strategy):
         async with self._sem:  # bound concurrent contexts
             context = await browser.new_context(**context_kwargs)
             try:
+                # Patch the detection surface before any page script runs.
+                await context.add_init_script(_STEALTH_JS)
                 if self.block_resources:
                     await self._install_blocking(context)
                 page = await context.new_page()
