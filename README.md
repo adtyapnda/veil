@@ -184,6 +184,14 @@ class MyStrategy(Strategy):
 pytest          # engine logic is fully tested with fake strategies (no network)
 ```
 
+## Contributing
+
+This is a learning-friendly project and **contributions are welcome** — including
+from people new to Python. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up,
+and [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md) for well-scoped starter tasks
+(each names the files to touch and a hint). New strategies, parsers, docs, and
+tests are all fair game.
+
 ## ⚖️ Responsible use
 
 This tool is for collecting **publicly accessible** data you're allowed to
