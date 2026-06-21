@@ -5,12 +5,19 @@ block heuristic fired, and response size -- so you can see exactly which tier
 beats which defense. Targets below are public pages intended for testing
 scrapers (or harmless control pages).
 
-Run:  python examples/battletest.py   (needs the [all] extra + chromium)
+Run:  python examples/battletest.py                 (direct, no proxy)
+      python examples/battletest.py http://user:pass@host:port   (via proxy)
+
+Needs the [all] extra + chromium.
 """
 import asyncio
+import sys
 
 from veil.models import FetchRequest
 from veil.strategies import BrowserStrategy, HttpBasicStrategy, TlsImpersonateStrategy
+
+# Optional residential/mobile proxy passed as the first CLI arg.
+PROXY = sys.argv[1] if len(sys.argv) > 1 else None
 
 TARGETS = [
     ("control: example.com", "https://example.com", "Example Domain"),
@@ -23,7 +30,7 @@ TARGETS = [
 async def probe(strategy, url, marker):
     req = FetchRequest(url=url, success_marker=marker, timeout=30.0)
     try:
-        resp = await strategy.fetch(req)
+        resp = await strategy.fetch(req, proxy=PROXY)
         blocked = strategy.looks_blocked(resp, req)
         verdict = "BLOCKED" if blocked else "OK"
         return f"{verdict:8} status={resp.status:<3} bytes={len(resp.text):>7}"
@@ -38,6 +45,7 @@ async def main():
         TlsImpersonateStrategy(),
         BrowserStrategy(),  # block_resources + humanize on by default
     ]
+    print(f"proxy: {PROXY or '(none - direct connection)'}")
     try:
         for label, url, marker in TARGETS:
             print(f"\n# {label}\n  {url}")
