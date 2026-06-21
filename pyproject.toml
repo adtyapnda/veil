@@ -29,8 +29,16 @@ dependencies = [
 tls = ["curl_cffi>=0.7"]
 # Full headless browser with stealth patches.
 browser = ["playwright>=1.44", "playwright-stealth>=1.0.6"]
+# HTML/JSON-LD parsing helpers.
+parse = ["beautifulsoup4>=4.12", "lxml>=5.0"]
 # Everything.
-all = ["curl_cffi>=0.7", "playwright>=1.44", "playwright-stealth>=1.0.6"]
+all = [
+    "curl_cffi>=0.7",
+    "playwright>=1.44",
+    "playwright-stealth>=1.0.6",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5"]
 
 [project.scripts]

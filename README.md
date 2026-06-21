@@ -92,6 +92,45 @@ async def main():
 asyncio.run(main())
 ```
 
+## Crawling at scale (any site)
+
+`veil fetch` is one URL. `veil crawl` is **many pages of any site** — concurrent,
+resumable, streaming to JSONL, with dedupe and proxy rotation. Extraction defaults
+to JSON-LD / schema.org (stable across redesigns); drop to CSS selectors when a
+site doesn't expose structured data.
+
+```bash
+# Paginated search, JSON-LD extraction, 8 workers, resumable
+veil crawl \
+  --url-template "https://example.com/search?page={page}" \
+  --pages 50 \
+  --concurrency 8 --delay 0.5 --jitter 0.5 \
+  --out listings.jsonl --checkpoint crawl.ckpt
+
+# Custom CSS selectors (capture the repeating card + fields from DevTools)
+veil crawl \
+  --url-template "https://example.com/list?p={page}" --pages 20 \
+  --extract css --card "div.listing-card" \
+  --field "title=h2.title" --field "price=span.price" \
+  --out out.jsonl
+
+# Follow detail links matching a regex, scale across many proxies
+veil crawl --url "https://example.com/index" \
+  --follow "/property/\d+" \
+  --proxy-file proxies.txt --concurrency 16 \
+  --out out.jsonl --checkpoint crawl.ckpt
+```
+
+**Resume:** if a run is interrupted (crash, ban, Ctrl-C), rerun the *same command*
+with the same `--checkpoint` — completed URLs and already-seen records are skipped.
+
+Pacing is owned by the crawler (`--delay` + `--jitter`, per worker), so effective
+request rate ≈ `concurrency / delay`. Tune down for politeness, add proxies to scale
+up. See [examples/crawl_any_site.py](examples/crawl_any_site.py) for the library API.
+
+> Robots is respected by default here too. `--no-robots` exists for sites you own
+> or are authorized to crawl; using it elsewhere is on you (see Responsible use).
+
 ## Extending: write your own strategy
 
 ```python
