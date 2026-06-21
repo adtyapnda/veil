@@ -1,0 +1,141 @@
+# veil
+
+A modular, **polite** web scraper that *cascades* through fetch strategies —
+from a near-free HTTP request up to a full stealth browser — and stops at the
+cheapest one that actually returns the page.
+
+Most scrapers either send a naive `requests.get()` (and get blocked) or fire up
+a heavy headless browser for *everything* (slow and expensive). `veil` picks the
+lightest tool that works, per site, automatically.
+
+```
+                 ┌─────────────────────────────────────────────┐
+ fetch(url) ───► │  politeness gate (robots.txt + rate limit)   │
+                 └───────────────────────┬─────────────────────┘
+                                         ▼
+        cheapest ──► http_basic ──► tls_impersonate ──► browser ──► heaviest
+        (httpx)        (curl_cffi JA3/HTTP2)        (Playwright + stealth)
+                                         │
+                            escalates only when a tier
+                            returns a block/challenge page
+```
+
+## Why it's structured this way
+
+| Tier | Backend | Beats | Cost |
+|------|---------|-------|------|
+| `http_basic` | `httpx` + realistic headers | naive header filters | ~free |
+| `tls_impersonate` | `curl_cffi` | TLS/JA3 + HTTP2 fingerprinting | low |
+| `browser` | Playwright + stealth | JS challenges, behavioral checks | high |
+
+Cross-cutting concerns wrap **every** tier:
+
+- **Proxy pool** — round-robin rotation with per-proxy health/cooldown.
+- **Politeness** — robots.txt compliance + per-host rate limiting + exponential
+  backoff on transient errors.
+
+Each tier is a `Strategy` subclass, so adding your own (e.g. a CAPTCHA-solver
+hook, or an alternate impersonation library) is one small file.
+
+## Install
+
+```bash
+# Base (http_basic only) -- light, pure-Python deps
+pip install -e .
+
+# Add TLS fingerprint impersonation
+pip install -e ".[tls]"
+
+# Add the stealth browser tier
+pip install -e ".[browser]"
+playwright install chromium
+
+# Everything + dev tools
+pip install -e ".[all,dev]"
+```
+
+Optional tiers degrade gracefully: if `curl_cffi` or Playwright isn't installed,
+the engine simply skips that tier instead of crashing.
+
+## Usage
+
+### CLI
+
+```bash
+# Cascade automatically, print the page to stdout
+veil fetch https://example.com --marker "Example Domain"
+
+# Force a subset of strategies
+veil fetch https://example.com --strategies http_basic,tls_impersonate
+
+# Rotate through proxies, 2s between hits per host
+veil fetch https://example.com --proxy http://a:8080 --proxy http://b:8080 --delay 2
+```
+
+### Library
+
+```python
+import asyncio
+from veil import Engine, FetchRequest, Politeness, ProxyPool
+
+async def main():
+    engine = Engine(
+        proxy_pool=ProxyPool(["http://user:pass@host:port"]),
+        politeness=Politeness(respect_robots=True, delay=1.0),
+    )
+    resp = await engine.fetch(
+        FetchRequest(url="https://example.com", success_marker="Example Domain")
+    )
+    print(resp.strategy, resp.status, len(resp.text))
+    await engine.aclose()
+
+asyncio.run(main())
+```
+
+## Extending: write your own strategy
+
+```python
+from veil.strategies.base import Strategy
+from veil.models import FetchResponse
+
+class MyStrategy(Strategy):
+    name = "my_strategy"
+    cost = 50  # where it sits in the cascade (lower = tried earlier)
+
+    async def fetch(self, request, *, proxy=None):
+        ...  # return a FetchResponse or raise
+
+# engine = Engine(strategies=[HttpBasicStrategy(), MyStrategy(), ...])
+```
+
+## Tests
+
+```bash
+pytest          # engine logic is fully tested with fake strategies (no network)
+```
+
+## ⚖️ Responsible use
+
+This tool is for collecting **publicly accessible** data you're allowed to
+collect — price monitoring, academic research, archiving, accessibility, etc.
+
+- `respect_robots=True` is the **default**. Turn it off only for domains you own
+  or are explicitly authorized to crawl.
+- Rate limiting is on by default. Don't remove it to hammer a site — that's
+  abusive and may be illegal (e.g. degrading a service).
+- Respect each site's Terms of Service and applicable law (CFAA, GDPR, copyright,
+  database rights). Scraping personal data or copyrighted content can carry
+  legal risk regardless of what this tool *can* do.
+- Do **not** use `veil` to bypass authentication, paywalls, or access controls
+  on content you aren't entitled to.
+
+You are responsible for how you use it. See [LICENSE](LICENSE) (MIT, no warranty).
+
+## Roadmap
+
+- [ ] Per-domain strategy memory (remember which tier worked, skip the cheap ones)
+- [ ] Pluggable CAPTCHA-solver hook
+- [ ] Concurrent crawl queue with per-host concurrency caps
+- [ ] Response caching layer
+- [ ] Metrics/observability (success rate per strategy & proxy)
+```

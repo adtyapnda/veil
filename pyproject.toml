@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "veil-scraper"
+version = "0.1.0"
+description = "A modular, polite web scraper that cascades from cheap HTTP to full-browser strategies to fetch sites with anti-bot defenses."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Your Name" }]
+keywords = ["scraping", "crawler", "anti-bot", "tls-fingerprint", "playwright", "proxy"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+]
+
+# Base install stays light: just httpx + robots/politeness.
+dependencies = [
+    "httpx[http2,brotli]>=0.27",
+    "tenacity>=8.2",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+# Real-browser TLS/JA3 + HTTP2 fingerprinting without a browser.
+tls = ["curl_cffi>=0.7"]
+# Full headless browser with stealth patches.
+browser = ["playwright>=1.44", "playwright-stealth>=1.0.6"]
+# Everything.
+all = ["curl_cffi>=0.7", "playwright>=1.44", "playwright-stealth>=1.0.6"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5"]
+
+[project.scripts]
+veil = "veil.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourname/veil"
+Issues = "https://github.com/yourname/veil/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/veil"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
