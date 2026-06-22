@@ -24,6 +24,47 @@ lightest tool that works, per site, automatically.
                             returns a block/challenge page
 ```
 
+## Quick start
+
+Needs Python 3.9+. Install the full tool straight from GitHub:
+
+```bash
+pip install "veil-scraper[all] @ git+https://github.com/adtyapnda/veil"
+playwright install chromium   # only needed for the browser tier
+```
+
+> Just want the light version (plain HTTP, no browser)?
+> `pip install "git+https://github.com/adtyapnda/veil"`
+
+Then use the `veil` command:
+
+```bash
+# fetch one page (auto-picks the cheapest tier that works)
+veil fetch https://example.com
+
+# crawl many pages to a file, resumable if it stops
+veil crawl --url-template "https://example.com/search?page={page}" \
+  --pages 50 --out results.jsonl --checkpoint run.ckpt
+```
+
+Or from Python:
+
+```python
+import asyncio
+from veil import Engine
+
+async def main():
+    engine = Engine()
+    resp = await engine.fetch("https://example.com")
+    print(resp.strategy, resp.status, len(resp.text))
+    await engine.aclose()
+
+asyncio.run(main())
+```
+
+Prefer to read/modify the code? Clone instead: `git clone https://github.com/adtyapnda/veil`
+then `pip install -e ".[all]"` (see [Install](#install) and [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ## Why it's structured this way
 
 | Tier | Backend | Beats | Cost |
