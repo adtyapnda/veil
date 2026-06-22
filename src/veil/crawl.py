@@ -86,7 +86,11 @@ class _Checkpoint:
 
 
 def _default_key(record: dict) -> str:
-    return str(record.get("url") or record.get("id") or json.dumps(record, sort_keys=True))
+    # Dedupe on the full record content. Keying on a single field like "url" is
+    # wrong when one page yields many records that share a link (e.g. quotes that
+    # all link to the same author page) -- it silently drops real rows. Pass a
+    # custom key_fn to Crawler if you want id/url-based dedupe instead.
+    return json.dumps(record, sort_keys=True, ensure_ascii=False)
 
 
 class Crawler:
